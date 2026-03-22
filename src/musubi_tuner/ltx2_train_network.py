@@ -3435,12 +3435,11 @@ class LTX2NetworkTrainer(NetworkTrainer):
                         )
                         self._warned_missing_audio = True
                 else:
-                    if not self._warned_missing_audio:
-                        logger.warning(
-                            "LTXAV mode: missing audio latents in this batch; skipping audio branch. "
-                            "Provide cached audio latents to train audio generation."
-                        )
-                        self._warned_missing_audio = True
+                    raise ValueError(
+                        "LTXAV 模式错误：当前批次缺失音频 Latent。这通常是因为缓存步骤未开启音频模式。"
+                        "请重新运行 ltx2_cache_latents.py 并确保 --ltx2_mode 设置为 av 或 va 以缓存音频特征。"
+                        "如果您希望在部分样本缺失音频的情况下继续，请启用 --audio_silence_regularizer。"
+                    )
             if audio_latents is not None:
                 if not isinstance(audio_latents, torch.Tensor):
                     raise TypeError(f"Expected audio_latents to be a torch.Tensor, got: {type(audio_latents)}")
@@ -6293,7 +6292,7 @@ def ltx2_setup_parser(parser: argparse.ArgumentParser) -> argparse.ArgumentParse
     parser.add_argument(
         "--ltx2_checkpoint",
         type=str,
-        required=True,
+        default=None,
         help="Path to LTX-2 checkpoint (.safetensors)",
     )
     parser.add_argument(
@@ -7091,6 +7090,11 @@ def main() -> None:
 
     args = parser.parse_args()
     args = read_config_from_file(args, parser)
+    
+    # Sync ltx2_mode from TOML to ltx_mode (dest)
+    if hasattr(args, "ltx2_mode") and args.ltx2_mode:
+        args.ltx_mode = args.ltx2_mode
+
     if hasattr(args, "ltx_mode"):
         short_map = {"v": "video", "a": "audio", "va": "av"}
         if args.ltx_mode in short_map:

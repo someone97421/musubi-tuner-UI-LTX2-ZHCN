@@ -2,6 +2,8 @@ __pycache__/
 .venv
 venv/
 logs/
+output/
+python_embed/
 uv.lock
 main.exp
 main.lib

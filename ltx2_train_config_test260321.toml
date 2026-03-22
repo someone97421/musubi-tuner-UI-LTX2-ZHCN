@@ -1,0 +1,51 @@
+ltx2_checkpoint = "E:\\ComfyUI\\ComfyUI\\models\\checkpoints\\LTX-2\\ltx-2.3-22b-dev.safetensors"
+output_dir = "./outputs/TEST3"
+output_name = "ltx2_loraTEST3"
+dataset_config = "dataset_ltx2.toml"
+gemma_safetensors = "E:\\ComfyUI\\ComfyUI\\models\\text_encoders\\gemma_3_12B_it_fp8_scaled.safetensors"
+ltx_mode = "av"
+lora_target_preset = "t2v"
+network_module = "networks.lora_ltx2"
+network_dim = 16
+network_alpha = 16.0
+max_train_epochs = 10
+train_batch_size = 1
+seed = 1026
+gradient_checkpointing = true
+gradient_accumulation_steps = 1
+guidance_scale = 1.0
+mixed_precision = "bf16"
+ltx_version = "2.3"
+ltx_version_check_mode = "warn"
+fp8_base = true
+fp8_scaled = true
+flash_attn = true
+blocks_to_swap = 20
+use_pinned_memory_for_block_swap = true
+img_in_txt_in_offloading = true
+# Prodigy 优化器配置
+# Prodigy 使用自适应学习率，建议 lr=1.0，配合 constant 调度器
+learning_rate = 1.0
+lr_scheduler = "constant"
+lr_decay_steps = 0.2
+lr_scheduler_min_lr_ratio = 0.1
+
+# Prodigy 优化器参数 (可选)
+# optimizer_args = [
+#     "betas=(0.9, 0.999)",           # Adam beta 参数
+#     "beta3=0.9",                    # 二阶矩估计衰减率 (None=不使用)
+#     "d0=1e-6",                      # 初始学习率
+#     "growth_rate=1.02",             # 学习率增长率 (inf=无限制)
+#     "use_bias_correction=True",     # 使用偏差修正
+#     "safeguard_warmup=True",        # Warmup 保护
+# ]
+timestep_sampling = "shift"
+discrete_flow_shift = 3.0
+# Prodigy 优化器需要使用完整模块路径
+optimizer_type = "prodigyopt.Prodigy"
+save_every_n_epochs = 5
+log_with = "tensorboard"
+logging_dir = "./logs"
+persistent_data_loader_workers = true
+cuda_allow_tf32 = true
+cuda_cudnn_benchmark = true

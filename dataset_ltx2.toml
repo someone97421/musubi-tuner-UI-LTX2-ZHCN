@@ -1,0 +1,13 @@
+[[datasets]]
+video_directory = "C:\\Users\\12577\\Desktop\\Desktop(2)\\video"
+cache_directory = "C:\\Users\\12577\\Desktop\\Desktop(2)\\CACHE"
+target_frames = [ 49, 97, 145, 193, 201,]
+max_frames = 201
+target_fps = 25.0
+
+[general]
+resolution = [ 960, 544,]
+caption_extension = ".txt"
+batch_size = 1
+enable_bucket = true
+bucket_no_upscale = false
