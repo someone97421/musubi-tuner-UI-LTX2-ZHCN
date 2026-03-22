@@ -1,4 +1,13 @@
 # Musubi Tuner
+<img width="1515" height="506" alt="PixPin_2026-03-22_10-58-59" src="https://github.com/user-attachments/assets/8382ab4a-b64b-455b-9ba4-6f258bf04555" />
+<img width="1510" height="917" alt="PixPin_2026-03-22_10-59-13" src="https://github.com/user-attachments/assets/961e3fe3-934a-4d97-9df2-004cd83d2e0c" />
+<img width="1502" height="1144" alt="PixPin_2026-03-22_10-59-23" src="https://github.com/user-attachments/assets/7f83133b-7b85-4f40-8aa9-1ce871c83dd5" />
+<img width="1511" height="938" alt="PixPin_2026-03-22_10-59-35" src="https://github.com/user-attachments/assets/24ea9ace-a3dd-4de0-9987-35a9ddb25dfd" />
+<img width="1498" height="1032" alt="PixPin_2026-03-22_10-59-44" src="https://github.com/user-attachments/assets/91e264d4-7fa4-4343-b886-cc88b93e394b" />
+<img width="1495" height="1016" alt="PixPin_2026-03-22_10-59-53" src="https://github.com/user-attachments/assets/c3ca09c4-bdc9-4b85-b12d-ab2d2e5f779b" />
+<img width="1521" height="1180" alt="PixPin_2026-03-22_11-00-00" src="https://github.com/user-attachments/assets/0803ac25-ea7e-436f-bf16-1d6cc0193cca" />
+<img width="1546" height="716" alt="PixPin_2026-03-22_11-00-14" src="https://github.com/user-attachments/assets/783695db-c4a1-4cf9-bad1-6691b51f7398" />
+
 
 [English](./README.md) | [日本語](./README.ja.md)
 
