@@ -117,7 +117,7 @@ TRAIN_DEFAULTS = {
     "exclude_patterns": "",
     "include_patterns": "",
     "max_train_epochs": 10,
-    "max_train_steps": "",
+    "max_train_steps": "5000",
     "train_batch_size": 1,
     "seed": 1026,
     "gradient_checkpointing": True,
@@ -159,8 +159,8 @@ TRAIN_DEFAULTS = {
     "learning_rate": "1e-4",
     "audio_lr": "",
     "lr_args": "",
-    "lr_scheduler": "cosine_with_min_lr",
-    "lr_warmup_steps": 0,
+    "lr_scheduler": "constant_with_warmup",
+    "lr_warmup_steps": 50,
     "lr_decay_steps": 0.2,
     "lr_scheduler_num_cycles": 1,
     "lr_scheduler_power": 1.0,
@@ -187,7 +187,7 @@ TRAIN_DEFAULTS = {
     "prodigy_use_speed": False,
     "prodigy_safeguard_warmup": False,
     "save_every_n_epochs": 2,
-    "save_every_n_steps": "",
+    "save_every_n_steps": "250",
     "save_last_n_epochs": "",
     "save_last_n_steps": "",
     "save_state": False,
@@ -196,7 +196,7 @@ TRAIN_DEFAULTS = {
     "log_with": "tensorboard",
     "logging_dir": "./logs",
     "enable_sample": False,
-    "sample_at_first": True,
+    "sample_at_first": False,
     "sample_every_n_epochs": 2,
     "sample_every_n_steps": "",
     "sample_prompts": "",
@@ -1089,7 +1089,7 @@ with gr.Blocks(title="LTX2 训练控制台", theme=ui_theme) as app:
             with gr.Accordion("⏱️ 训练时长与批次", open=True):
                 with gr.Row():
                     max_train_epochs = gr.Number(label="最大 Epoch 数", value=10, precision=0)
-                    max_train_steps = gr.Textbox(label="最大训练步数 (空=不限)", value="")
+                    max_train_steps = gr.Textbox(label="最大训练步数 (空=不限)", value="5000")
                     batch_size = gr.Number(label="批次大小", value=1, precision=0)
                     seed = gr.Number(label="随机种子", value=1026, precision=0)
                 with gr.Row():
@@ -1152,9 +1152,9 @@ with gr.Blocks(title="LTX2 训练控制台", theme=ui_theme) as app:
                         choices=["constant","constant_with_warmup","linear","cosine",
                                  "cosine_with_restarts","polynomial","cosine_with_min_lr",
                                  "warmup_stable_decay","inverse_sqrt"],
-                        value="cosine_with_min_lr")
+                        value="constant_with_warmup")
                 with gr.Row():
-                    lr_warmup_steps = gr.Number(label="预热步数", value=0, precision=0)
+                    lr_warmup_steps = gr.Number(label="预热步数", value=50, precision=0)
                     lr_decay_steps = gr.Number(label="衰减步数", value=0.2)
                     lr_scheduler_num_cycles = gr.Number(label="余弦重启次数", value=1, precision=0)
                     lr_scheduler_power = gr.Number(label="Poly Power", value=1.0)
@@ -1184,7 +1184,8 @@ with gr.Blocks(title="LTX2 训练控制台", theme=ui_theme) as app:
                         choices=["AdamW","AdamW8bit","PagedAdamW8bit","adafactor",
                                  "Lion","Lion8bit","prodigyopt.Prodigy","DAdaptAdam",
                                  "Sophia","Ranger","StableAdamW","SOAP",
-                                 "adopt","came","ademamix","fira","sgdsai"],
+                                 "adopt","came","ademamix","fira","sgdsai",
+                                 "Muon","schedulefree.AdamWScheduleFree","schedulefree.RAdamScheduleFree"],
                         value="AdamW8bit")
                     max_grad_norm = gr.Number(label="Max Grad Norm", value=1.0)
                 
@@ -1216,7 +1217,7 @@ with gr.Blocks(title="LTX2 训练控制台", theme=ui_theme) as app:
             with gr.Accordion("💾 保存与追踪监控", open=False):
                 with gr.Row():
                     save_every_n_epochs = gr.Number(label="每N Epoch保存", value=2, precision=0)
-                    save_every_n_steps = gr.Textbox(label="每N步保存 (空=用Epoch)", value="")
+                    save_every_n_steps = gr.Textbox(label="每N步保存 (空=用Epoch)", value="250")
                     save_last_n_epochs = gr.Textbox(label="只保留最后N轮", value="")
                     save_last_n_steps = gr.Textbox(label="只保留最后N步", value="")
                 with gr.Row():
@@ -1228,7 +1229,7 @@ with gr.Blocks(title="LTX2 训练控制台", theme=ui_theme) as app:
             with gr.Accordion("🎞️ 训练内采样设置", open=False):
                 with gr.Row():
                     enable_sample = gr.Checkbox(label="启用训练中出图", value=False)
-                    sample_at_first = gr.Checkbox(label="训练开始前出图", value=True)
+                    sample_at_first = gr.Checkbox(label="训练开始前出图", value=False)
                     enable_sample_steps = gr.Textbox(label="每N步出图 (空=用Epoch)", value="")
                     sample_every_n_epochs = gr.Number(label="每N Epoch出图", value=2, precision=0)
                 with gr.Row():
