@@ -17,3 +17,6 @@ AGENTS.md
 .mcp.json
 references/
 projects/
+*_cache.json
+.cache/
+*.log
