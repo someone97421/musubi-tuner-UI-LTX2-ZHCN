@@ -506,12 +506,11 @@ def save_config(*args):
 #  Cache / 训练命令
 # ──────────────────────────────────────
 def run_cache_latents(dataset_cfg, dit_path, vae_p, vae_dtype_c, skip_existing, model_ver):
-    if not (dit_path and dit_path.strip()) and not (vae_p and vae_p.strip()):
-        return "❌ 错误：请先在界面顶部【0. 全局设置】中填写【DiT 权重路径】或【VAE 路径】！"
+    if not (vae_p and vae_p.strip()):
+        return "❌ 错误：请先在界面顶部【0. 全局设置】中填写【VAE 路径】！"
     
     cmd = [sys.executable, "flux_2_cache_latents.py",
            "--dataset_config", dataset_cfg or "dataset_flux2.toml"]
-    if dit_path and dit_path.strip(): cmd += ["--dit", dit_path.strip()]
     if vae_p and vae_p.strip(): cmd += ["--vae", vae_p.strip()]
     if vae_dtype_c: cmd += ["--vae_dtype", vae_dtype_c]
     if skip_existing: cmd += ["--skip_existing"]
@@ -526,7 +525,6 @@ def run_cache_te(dataset_cfg, text_enc_path, te_dtype, skip_existing, model_ver,
     cmd = [sys.executable, "flux_2_cache_text_encoder_outputs.py",
            "--dataset_config", dataset_cfg or "dataset_flux2.toml"]
     if text_enc_path and text_enc_path.strip(): cmd += ["--text_encoder", text_enc_path.strip()]
-    if te_dtype: cmd += ["--mixed_precision", te_dtype]
     if skip_existing: cmd += ["--skip_existing"]
     if model_ver: cmd += ["--model_version", model_ver]
     if fp8_te: cmd += ["--fp8_text_encoder"]
@@ -548,8 +546,8 @@ def generate_dataset_toml(res_w, res_h, cap_ext, b_size, e_bucket, no_upscale, i
             "image_directory": img_dir,
             "cache_directory": cache_dir,
         }
-        if control_dir and control_dir.strip():
-            ds_cfg["control_images"] = control_dir.strip()
+        if control_dir and str(control_dir).strip() and str(control_dir).strip().lower() != "none":
+            ds_cfg["control_images"] = str(control_dir).strip()
 
         config = {
             "general": gen_cfg,
