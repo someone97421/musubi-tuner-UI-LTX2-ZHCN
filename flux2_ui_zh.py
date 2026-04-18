@@ -36,7 +36,7 @@ def _run_in_thread(cmd):
     log_queue.put("==========================================\n")
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
-    
+
     try:
         current_process = subprocess.Popen(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -342,8 +342,8 @@ def _dataset_updates_from_cache(cache):
         gr.update(value=dataset_values["ds_bucket_no_upscale"]),
         gr.update(value=dataset_values["ds_img_dir"]),
         gr.update(value=dataset_values["ds_cache_dir"]),
-        gr.update(value=dataset_values["ds_save_path"]),
         gr.update(value=dataset_values["ds_control_images_dir"]),
+        gr.update(value=dataset_values["ds_save_path"]),
     ]
 
 def load_config_file(path):
@@ -371,7 +371,7 @@ def build_config(
     max_train_epochs, max_train_steps, batch_size, seed,
     gradient_checkpointing, gradient_checkpointing_cpu_offload, gradient_accumulation_steps,
     caption_dropout_rate,
-    mixed_precision, vae_dtype, 
+    mixed_precision, vae_dtype,
     fp8_base, fp8_scaled, fp8_text_encoder,
     attention_mode, blocks_to_swap, use_pinned_memory_for_block_swap,
     loss_type, huber_delta,
@@ -467,7 +467,7 @@ def build_config(
     if save_state_on_train_end: cfg["save_state_on_train_end"] = True
     elif save_state: cfg["save_state"] = True
     if resume: cfg["resume"] = resume
-    
+
     if log_with:
         cfg["log_with"] = log_with
         if logging_dir: cfg["logging_dir"] = logging_dir
@@ -508,7 +508,7 @@ def save_config(*args):
 def run_cache_latents(dataset_cfg, dit_path, vae_p, vae_dtype_c, skip_existing, model_ver):
     if not (vae_p and vae_p.strip()):
         return "❌ 错误：请先在界面顶部【0. 全局设置】中填写【VAE 路径】！"
-    
+
     cmd = [sys.executable, "flux_2_cache_latents.py",
            "--dataset_config", dataset_cfg or "dataset_flux2.toml"]
     if vae_p and vae_p.strip(): cmd += ["--vae", vae_p.strip()]
@@ -521,7 +521,7 @@ def run_cache_latents(dataset_cfg, dit_path, vae_p, vae_dtype_c, skip_existing, 
 def run_cache_te(dataset_cfg, text_enc_path, te_dtype, skip_existing, model_ver, fp8_te):
     if not (text_enc_path and text_enc_path.strip()):
         return "❌ 错误：请先在界面顶部【0. 全局设置】中填写【Text Encoder 路径】！"
-        
+
     cmd = [sys.executable, "flux_2_cache_text_encoder_outputs.py",
            "--dataset_config", dataset_cfg or "dataset_flux2.toml"]
     if text_enc_path and text_enc_path.strip(): cmd += ["--text_encoder", text_enc_path.strip()]
@@ -593,7 +593,7 @@ def run_training(config_path):
         if not cfg_check.get("dit"):
             return ("❌ 配置文件中缺少 dit！"
                     "请在顶部填写 DiT 模型路径后重新保存配置。")
-                    
+
         log_w = cfg_check.get("log_with", "")
         log_d = cfg_check.get("logging_dir", "./logs")
         if log_w in ("tensorboard", "all"):
@@ -618,301 +618,833 @@ def run_training(config_path):
     return f"已启动 FLUX.2 训练（配置：{p}），请查看调试框。"
 
 
+# ──────────────────────────────────────
+#  文件选择辅助函数
+# ──────────────────────────────────────
+import sys
+import subprocess
+
+def _browse_file():
+    try:
+        code = "import tkinter as tk; from tkinter import filedialog; root = tk.Tk(); root.attributes('-topmost', True); root.withdraw(); p = filedialog.askopenfilename(); root.destroy(); print(p)"
+        res = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+        p = res.stdout.strip()
+        return p if p else gr.update()
+    except Exception as e:
+        return gr.update()
+
+def _browse_dir():
+    try:
+        code = "import tkinter as tk; from tkinter import filedialog; root = tk.Tk(); root.attributes('-topmost', True); root.withdraw(); p = filedialog.askdirectory(); root.destroy(); print(p)"
+        res = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+        p = res.stdout.strip()
+        return p if p else gr.update()
+    except Exception as e:
+        return gr.update()
+
+def on_file_upload(file_obj):
+    """处理文件上传，返回文件路径"""
+    if file_obj is not None:
+        return file_obj.name
+    return ""
+
+
 # ══════════════════════════════════════════════════
 #  UI 布局
 # ══════════════════════════════════════════════════
 ui_theme = gr.themes.Soft(
-    primary_hue="blue",
+    primary_hue="violet",
+    secondary_hue="indigo",
+    neutral_hue="zinc",
     font=[gr.themes.GoogleFont("Inter"), "ui-sans-serif", "system-ui", "sans-serif"]
+).set(
+    body_background_fill="*neutral_950",
+    body_background_fill_dark="*neutral_950",
+    body_text_color="*neutral_100",
+    body_text_color_subdued="*neutral_400",
+    background_fill_primary="*neutral_900",
+    background_fill_secondary="*neutral_800",
+    background_fill_primary_dark="*neutral_900",
+    background_fill_secondary_dark="*neutral_800",
+    border_color_primary="*neutral_700",
+    border_color_primary_dark="*neutral_700",
+    block_background_fill="*neutral_900",
+    block_background_fill_dark="*neutral_900",
+    block_label_background_fill="*neutral_800",
+    block_label_background_fill_dark="*neutral_800",
+    block_label_text_color="*neutral_200",
+    block_title_text_color="*neutral_200",
+    input_background_fill="*neutral_950",
+    input_background_fill_dark="*neutral_950",
+    input_border_color="*neutral_700",
+    input_border_color_focus="*primary_500",
+    button_primary_background_fill="*primary_600",
+    button_primary_background_fill_hover="*primary_500",
+    button_primary_text_color="*neutral_50",
+    button_secondary_background_fill="*neutral_800",
+    button_secondary_background_fill_hover="*neutral_700",
+    button_secondary_text_color="*neutral_100",
+    button_cancel_background_fill="*red_600",
+    button_cancel_background_fill_hover="*red_500",
+    color_accent="*primary_500",
+    slider_color="*primary_500",
 )
 
-with gr.Blocks(title="FLUX.2 训练控制台", theme=ui_theme) as app:
-    gr.Markdown("# 🎨 FLUX.2 图像模型训练中文控制台 (Musubi-Tuner)")
-    gr.Markdown("支持 FLUX.2 [dev]、[klein-4b]、[klein-9b] 及其 base 版本的图像生成模型训练")
+css = """
+/* ── 全局容器 ── */
+.app-shell {
+    max-width: 1520px;
+    margin: 0 auto;
+    padding: 24px 28px 40px;
+}
 
-    # ────────────────────────────────────────────────
-    #  顶部全局路径区（所有标签页共用）
-    # ────────────────────────────────────────────────
-    with gr.Group():
-        gr.Markdown("## 📂 全局路径设置（所有步骤共用）")
-        with gr.Row():
-            g_dit = gr.Textbox(label="★ DiT 模型路径 (--dit，必填)",
-                                 placeholder="path/to/flux2-dev.safetensors", scale=3)
-            g_model_ver = gr.Dropdown(label="模型版本 (--model_version)",
-                                        choices=["dev", "klein-4b", "klein-base-4b", "klein-9b", "klein-base-9b"],
-                                        value="dev", scale=1)
-        with gr.Row():
-            g_vae = gr.Textbox(label="★ VAE 路径 (--vae，必填)",
-                               placeholder="path/to/ae.safetensors", scale=2)
-            g_text_encoder = gr.Textbox(label="★ Text Encoder 路径 (--text_encoder，必填)",
-                                      placeholder="path/to/00001-of-00010.safetensors", scale=2)
-        with gr.Row():
-            g_dataset = gr.Textbox(label="数据集配置文件 (--dataset_config)",
-                                   value="dataset_flux2.toml", scale=2)
-            g_output_dir = gr.Textbox(label="输出目录 (--output_dir)", value="./outputs", scale=2)
-            g_output_name = gr.Textbox(label="输出模型名称 (--output_name)", value="flux2_lora", scale=2)
-        with gr.Row():
-            g_config_path = gr.Textbox(label="训练配置文件路径（保存/读取）",
-                                       value="flux2_train_config.toml", scale=3)
+/* ── 头部 ── */
+.hero-header {
+    text-align: center;
+    padding: 28px 20px 22px;
+    margin-bottom: 8px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, rgba(124,58,237,0.18), rgba(79,70,229,0.10), rgba(16,185,129,0.06));
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+}
+.hero-title {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(90deg, #c084fc, #818cf8, #34d399);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 6px;
+}
+.hero-subtitle {
+    font-size: 14px;
+    color: rgba(255,255,255,0.55);
+    font-weight: 500;
+    line-height: 1.5;
+}
 
-        with gr.Row():
-            load_btn = gr.Button("📂 载入配置文件", size="sm")
-            save_top_btn = gr.Button("💾 快速保存配置", variant="primary", size="sm")
-            reset_btn = gr.Button("↺ 恢复默认参数", size="sm")
-            load_status = gr.Textbox(label="", interactive=False, scale=3)
+/* ── 卡片面板 ── */
+.panel-card {
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 18px;
+    padding: 22px 24px 24px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015));
+    box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+    margin-bottom: 4px;
+}
+.panel-card:hover {
+    border-color: rgba(255,255,255,0.09);
+}
+.panel-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.panel-header-icon {
+    font-size: 20px;
+    line-height: 1;
+}
+.panel-header-text {
+    font-size: 16px;
+    font-weight: 700;
+    color: #e4e4e7;
+    letter-spacing: 0.2px;
+}
 
-    gr.Markdown("---")
+/* ── 字段标签 ── */
+.field-chip {
+    display: inline-block;
+    margin-bottom: 8px;
+    padding: 5px 12px;
+    border-radius: 8px;
+    background: linear-gradient(90deg, #4f46e5, #7c3aed);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.3;
+    box-shadow: 0 2px 8px rgba(79,70,229,0.25);
+    letter-spacing: 0.3px;
+}
+.field-chip-alt {
+    background: linear-gradient(90deg, #059669, #10b981);
+    box-shadow: 0 2px 8px rgba(16,185,129,0.25);
+}
+.field-chip-warn {
+    background: linear-gradient(90deg, #d97706, #f59e0b);
+    box-shadow: 0 2px 8px rgba(245,158,11,0.25);
+}
 
-    with gr.Tabs():
+/* ── 路径输入行 ── */
+.path-field {
+    gap: 10px !important;
+    align-items: center !important;
+    background: transparent !important;
+}
+.path-field > div {
+    background: transparent !important;
+}
+.path-field > .gradio-textbox {
+    flex: 1 1 auto !important;
+}
+.path-box,
+.path-box > div {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+.path-box textarea,
+.path-box input {
+    min-height: 42px !important;
+    height: 42px !important;
+    box-sizing: border-box !important;
+    resize: none !important;
+    overflow-y: hidden !important;
+    scrollbar-width: none !important;
+    background: rgba(0,0,0,0.25) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 10px !important;
+    padding: 10px 14px !important;
+    color: #e4e4e7 !important;
+    font-size: 13px !important;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    margin: 0 !important;
+}
+.path-box textarea:focus,
+.path-box input:focus {
+    border-color: rgba(139,92,246,0.5) !important;
+    box-shadow: 0 0 0 3px rgba(139,92,246,0.12) !important;
+}
+.path-box textarea::-webkit-scrollbar,
+.path-box input::-webkit-scrollbar {
+    display: none !important;
+}
 
-        # ══════════════════════════════════
-        #  Tab 1: 数据集准备
-        # ══════════════════════════════════
-        with gr.Tab("🗂️ 1. 数据集准备 (Dataset & Cache)"):
+/* 如果 .path-upload 是一个外围 div，则自身透明以便内层按钮可撑满 */
+div.path-upload {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    height: auto !important;
+    min-height: 42px !important;
+}
 
-            with gr.Accordion("📝 1.1 生成数据集配置文件 (TOML)", open=True):
-                gr.Markdown("FLUX.2 是图像生成模型，请配置图像数据集。支持单图训练和多图训练，control_images 用于参考图像（编辑/参考生成任务）。")
-                with gr.Row():
-                    ds_res_w = gr.Number(label="Resolution Width", value=1024, precision=0)
-                    ds_res_h = gr.Number(label="Resolution Height", value=1024, precision=0)
-                    ds_cap_ext = gr.Textbox(label="Caption Extension", value=".txt")
-                with gr.Row():
-                    ds_batch_size = gr.Number(label="Batch Size", value=1, precision=0)
-                    ds_enable_bucket = gr.Checkbox(label="Enable Bucket", value=True)
-                    ds_bucket_no_upscale = gr.Checkbox(label="Bucket No Upscale", value=False)
-                with gr.Row():
-                    ds_img_dir = gr.Textbox(label="Image Directory (图像文件夹)", value="", placeholder="path/to/images")
-                    ds_cache_dir = gr.Textbox(label="Cache Directory (缓存文件夹)", value="", placeholder="path/to/cache")
-                with gr.Row():
-                    ds_control_dir = gr.Textbox(label="Control Images Dir (参考图像文件夹，可选)", 
-                                                  value="", placeholder="path/to/control_images")
-                with gr.Row():
-                    ds_save_path = gr.Textbox(label="保存路径", value="dataset_flux2.toml")
-                    ds_gen_btn = gr.Button("📄 生成数据集配置", variant="primary")
-                ds_gen_status = gr.Textbox(label="状态", interactive=False)
-                ds_gen_btn.click(
-                    fn=generate_dataset_toml,
-                    inputs=[ds_res_w, ds_res_h, ds_cap_ext, ds_batch_size, ds_enable_bucket, ds_bucket_no_upscale,
-                            ds_img_dir, ds_cache_dir, ds_control_dir, ds_save_path, g_config_path],
-                    outputs=[ds_gen_status, g_dataset]
-                )
-                
-            with gr.Accordion("🗂️ 1.2 预缓存 Latent 与文本特征", open=True):
-                gr.Markdown("""
-                预缓存图像 Latent 和文本编码器输出，大幅加速训练。  
-            **模型路径和数据集配置文件均读取自顶部全局设置，无需重复填写。**
-            """)
-                with gr.Row():
-                    with gr.Column():
-                        gr.Markdown("#### Cache Latents（编码图像特征）")
-                        with gr.Row():
-                            c_vae_dtype = gr.Dropdown(label="VAE Dtype", 
-                                                        choices=["", "float32", "bfloat16"], 
-                                                        value="bfloat16",
-                                                        info="默认float32，bfloat16可减少显存")
-                            c_skip_lc = gr.Checkbox(label="跳过已缓存文件 (--skip_existing)", value=True)
-                        cache_latents_btn = gr.Button("▶ 运行 Cache Latents", variant="primary")
+/* 匹配作为按钮自身的 .path-upload 以及它内部的 button/label */
+button.path-upload,
+label.path-upload,
+.path-upload button,
+.path-upload label,
+div.path-upload > button {
+    min-height: 42px !important;
+    height: 42px !important;
+    padding: 0 20px !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    border-radius: 10px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    white-space: nowrap !important;
+    background: linear-gradient(135deg, #4f46e5, #7c3aed) !important;
+    color: #fff !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    border: 1px solid rgba(255,255,255,0.22) !important;
+    box-shadow: 0 2px 10px rgba(79,70,229,0.3) !important;
+    transition: transform 0.15s, box-shadow 0.15s !important;
+    cursor: pointer !important;
+}
+button.path-upload:hover,
+label.path-upload:hover,
+.path-upload button:hover,
+.path-upload label:hover,
+div.path-upload > button:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 14px rgba(79,70,229,0.45) !important;
+}
 
-                    with gr.Column():
-                        gr.Markdown("#### Cache Text Encoder（编码文本特征）")
-                        te_dtype = gr.Dropdown(label="Text Encoder Dtype",
-                            choices=["", "fp16", "bf16", "fp32"], value="bf16")
-                        te_skip = gr.Checkbox(label="跳过已缓存文件 (--skip_existing)", value=True)
-                        te_fp8 = gr.Checkbox(label="FP8 Text Encoder (--fp8_text_encoder)", 
-                                             value=False,
-                                             info="dev(Mistral 3)不支持此选项")
-                        cache_te_btn = gr.Button("▶ 运行 Cache Text Encoder", variant="primary")
+/* ── 全局输入框滚动条隐藏 ── */
+textarea, input {
+    scrollbar-width: none !important;
+}
+textarea::-webkit-scrollbar,
+input::-webkit-scrollbar {
+    display: none !important;
+}
 
-                cache_status = gr.Textbox(label="操作状态", interactive=False)
+/* ── 终端日志区恢复滚动条 ── */
+.terminal-box textarea {
+    scrollbar-width: thin !important;
+}
+.terminal-box textarea::-webkit-scrollbar {
+    display: block !important;
+    width: 8px !important;
+}
+.terminal-box textarea::-webkit-scrollbar-track {
+    background: transparent !important;
+}
+.terminal-box textarea::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.15) !important;
+    border-radius: 4px !important;
+}
 
-                cache_latents_btn.click(
-                    fn=run_cache_latents,
-                    inputs=[g_dataset, g_dit, g_vae, c_vae_dtype, c_skip_lc, g_model_ver],
-                    outputs=cache_status
-                )
-                cache_te_btn.click(
-                    fn=run_cache_te,
-                    inputs=[g_dataset, g_text_encoder, te_dtype, te_skip, g_model_ver, te_fp8],
-                    outputs=cache_status
-                )
-                
-        # ══════════════════════════════════
-        #  Tab 2: 训练参数配置
-        # ══════════════════════════════════
-        with gr.Tab("⚙️ 2. 训练参数配置"):
+/* ── 状态框 ── */
+.tight-status textarea,
+.tight-status input {
+    min-height: 44px !important;
+    background: rgba(0,0,0,0.35) !important;
+    border: 1px solid rgba(255,255,255,0.06) !important;
+    border-radius: 10px !important;
+    font-size: 13px !important;
+    color: #a1a1aa !important;
+}
 
-            with gr.Accordion("🎨 模型与 LoRA 设置", open=True):
-                with gr.Row():
-                    network_module = gr.Dropdown(label="网络模块 (--network_module)",
-                        choices=["networks.lora_flux_2"],
-                        value="networks.lora_flux_2",
-                        info="FLUX.2 必须使用 networks.lora_flux_2")
-                    network_dim = gr.Number(label="Network Dim / Rank", value=32, precision=0)
-                    network_alpha = gr.Number(label="Network Alpha", value=16)
-                with gr.Row():
-                    network_dropout = gr.Number(label="Network Dropout", value=0)
-                    scale_weight_norms = gr.Number(label="Scale Weight Norms", value=0)
-                with gr.Row():
-                    network_weights = gr.Textbox(label="续训 LoRA 权重路径", placeholder="空=从头训练")
-                    dim_from_weights = gr.Checkbox(label="从权重读取 Dim", value=False)
-                    resume = gr.Textbox(label="续训状态路径 (--resume)", placeholder="空=不续训")
-                with gr.Row():
-                    enable_lora_plus = gr.Checkbox(label="启用 LoRA+", value=True)
-                    loraplus_lr_ratio = gr.Number(label="LoRA+ LR Ratio", value=4)
-                    enable_blocks = gr.Checkbox(label="启用块控制", value=False)
-                    exclude_patterns = gr.Textbox(label="Exclude Patterns")
-                    include_patterns = gr.Textbox(label="Include Patterns")
+/* ── 终端日志 ── */
+.terminal-box textarea {
+    background: #0c0c0e !important;
+    border: 1px solid rgba(255,255,255,0.07) !important;
+    border-radius: 14px !important;
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace !important;
+    font-size: 12.5px !important;
+    line-height: 1.6 !important;
+    color: #c8c8d0 !important;
+    padding: 16px 18px !important;
+    box-shadow: inset 0 0 24px rgba(0,0,0,0.5);
+}
 
-            with gr.Accordion("⏱️ 训练时长与批次", open=True):
-                with gr.Row():
-                    max_train_epochs = gr.Number(label="最大 Epoch 数", value=16, precision=0)
-                    max_train_steps = gr.Textbox(label="最大训练步数 (空=不限)", value="")
-                    batch_size = gr.Number(label="批次大小", value=1, precision=0)
-                    seed = gr.Number(label="随机种子", value=42, precision=0)
-                with gr.Row():
-                    gradient_checkpointing = gr.Checkbox(label="梯度检查点", value=True)
-                    gradient_accumulation_steps = gr.Number(label="梯度累积步数", value=1, precision=0)
-                    caption_dropout_rate = gr.Number(label="Caption Dropout Rate", value=0.0)
+/* ── Tab 美化 ── */
+.tab-nav {
+    gap: 6px !important;
+    padding: 4px !important;
+    background: rgba(0,0,0,0.25) !important;
+    border-radius: 14px !important;
+    border: 1px solid rgba(255,255,255,0.05) !important;
+}
+.tab-nav button {
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+    color: #a1a1aa !important;
+    border: none !important;
+    background: transparent !important;
+    padding: 10px 18px !important;
+    transition: all 0.2s;
+}
+.tab-nav button.selected {
+    background: linear-gradient(135deg, #4f46e5, #7c3aed) !important;
+    color: #fff !important;
+    box-shadow: 0 2px 12px rgba(79,70,229,0.35);
+}
 
-            with gr.Accordion("⚡ 精度与内存优化", open=False):
-                gr.Markdown("""
-                **内存优化推荐设置：**
-                - 基础优化：`--fp8_base --fp8_scaled` (DiT) + `--fp8_text_encoder` (Text Encoder, 除dev外)
-                - 进一步：`--blocks_to_swap` (不同模型最大值: dev=29, klein-4b=13, klein-9b=16)
-                - 极限：`--gradient_checkpointing_cpu_offload`
-                """)
-                with gr.Row():
-                    mixed_precision = gr.Dropdown(label="混合精度",
-                        choices=["bf16", "fp16", "no"], value="bf16",
-                        info="FLUX.2 推荐使用 bf16")
-                    vae_dtype = gr.Dropdown(label="VAE Dtype",
-                        choices=["", "float32", "bfloat16"], value="")
-                with gr.Row():
-                    fp8_base = gr.Checkbox(label="FP8 Base (--fp8_base, DiT)", value=True)
-                    fp8_scaled = gr.Checkbox(label="FP8 Scaled (--fp8_scaled, DiT)", value=True,
-                                             info="使用fp8_base时建议同时启用")
-                    fp8_text_encoder = gr.Checkbox(label="FP8 Text Encoder (--fp8_text_encoder)", value=False,
-                                                   info="dev(Mistral 3)不支持")
-                with gr.Row():
-                    attention_mode = gr.Dropdown(label="注意力机制",
-                        choices=["sdpa", "flash_attn", "xformers"], value="sdpa")
-                    blocks_to_swap = gr.Number(label="Blocks to Swap", value=0, precision=0,
-                                               info="dev最大29, klein-4b最大13, klein-9b最大16")
-                    use_pinned_memory_for_block_swap = gr.Checkbox(label="Pinned Memory", value=True)
-                with gr.Row():
-                    gradient_checkpointing_cpu_offload = gr.Checkbox(label="梯度检查点 CPU Offload", value=False)
+/* ── Accordion ── */
+.accordion-header {
+    background: rgba(255,255,255,0.03) !important;
+    border: 1px solid rgba(255,255,255,0.05) !important;
+    border-radius: 12px !important;
+    padding: 10px 14px !important;
+    font-weight: 600 !important;
+    font-size: 13.5px !important;
+    color: #d4d4d8 !important;
+    transition: background 0.2s;
+}
+.accordion-header:hover {
+    background: rgba(255,255,255,0.06) !important;
+}
 
-            with gr.Accordion("📊 Loss 设置", open=False):
-                with gr.Row():
-                    loss_type = gr.Dropdown(label="Loss 类型",
-                        choices=["mse","mae","l1","huber","smooth_l1"], value="mse")
-                    huber_delta = gr.Number(label="Huber Delta", value=1.0)
+/* ── 按钮组 ── */
+.btn-bar {
+    gap: 10px !important;
+}
+.btn-bar button {
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+    letter-spacing: 0.2px;
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+.btn-bar button:hover {
+    transform: translateY(-1px);
+}
 
-            with gr.Accordion("📈 学习率设置", open=False):
-                with gr.Row():
-                    lr = gr.Textbox(label="学习率", value="1e-4")
-                    lr_scheduler = gr.Dropdown(label="调度器",
-                        choices=["constant","constant_with_warmup","linear","cosine",
-                                 "cosine_with_restarts","polynomial","cosine_with_min_lr",
-                                 "warmup_stable_decay","inverse_sqrt"],
-                        value="constant_with_warmup")
-                with gr.Row():
-                    lr_warmup_steps = gr.Number(label="预热步数", value=50, precision=0)
-                    lr_decay_steps = gr.Number(label="衰减步数", value=0.2)
-                    lr_scheduler_num_cycles = gr.Number(label="余弦重启次数", value=1, precision=0)
-                    lr_scheduler_power = gr.Number(label="Poly Power", value=1.0)
-                    lr_scheduler_timescale = gr.Number(label="Timescale", value=0, precision=0)
-                    lr_scheduler_min_lr_ratio = gr.Number(label="Min LR Ratio", value=0.1)
+/* ── 小提示文字 ── */
+.hint-text {
+    color: rgba(255,255,255,0.45);
+    font-size: 12.5px;
+    line-height: 1.6;
+}
+.hint-text code {
+    background: rgba(255,255,255,0.08);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-family: "JetBrains Mono", Consolas, monospace;
+    font-size: 11.5px;
+    color: #c4b5fd;
+}
 
-            with gr.Accordion("⏰ 时间步采样", open=False):
-                with gr.Row():
-                    timestep_sampling = gr.Dropdown(label="时间步采样方式",
-                        choices=["sigma","uniform","sigmoid","shift","flux_shift",
-                                 "flux2_shift","logsnr","shifted_logit_normal"],
-                        value="flux2_shift",
-                        info="FLUX.2 推荐使用 flux2_shift")
-                with gr.Row():
-                    weighting_scheme = gr.Dropdown(label="加权方案",
-                        choices=["none","sigma_sqrt","logit_normal","mode","cosmap"], 
-                        value="none")
-                    logit_mean = gr.Number(label="Logit Mean", value=0.0)
-                    logit_std = gr.Number(label="Logit Std", value=1.0)
-                    mode_scale = gr.Number(label="Mode Scale", value=1.29)
-                    min_timestep = gr.Number(label="Min Timestep", value=0, precision=0)
-                    max_timestep = gr.Number(label="Max Timestep", value=1000, precision=0)
+/* ── 训练大按钮区 ── */
+.train-action-bar {
+    gap: 14px !important;
+}
+.train-action-bar button {
+    height: 52px !important;
+    border-radius: 14px !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 20px rgba(79,70,229,0.25);
+    transition: transform 0.15s, box-shadow 0.2s;
+}
+.train-action-bar button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 28px rgba(79,70,229,0.4);
+}
+"""
 
-            with gr.Accordion("🔧 优化器", open=False):
-                with gr.Row():
-                    optimizer_type = gr.Dropdown(label="优化器类型",
-                        choices=["AdamW","AdamW8bit","PagedAdamW8bit","adafactor",
-                                 "Lion","Lion8bit","prodigyopt.Prodigy","DAdaptAdam",
-                                 "Sophia","Ranger","StableAdamW","SOAP",
-                                 "adopt","came","ademamix","fira","sgdsai",
-                                 "Muon","schedulefree.AdamWScheduleFree","schedulefree.RAdamScheduleFree"],
-                        value="AdamW8bit")
-                    max_grad_norm = gr.Number(label="Max Grad Norm", value=1.0)
 
-            with gr.Accordion("💾 保存与追踪监控", open=False):
-                with gr.Row():
-                    save_every_n_epochs = gr.Number(label="每N Epoch保存", value=1, precision=0)
-                    save_every_n_steps = gr.Textbox(label="每N步保存 (空=用Epoch)", value="")
-                    save_last_n_epochs = gr.Textbox(label="只保留最后N轮", value="")
-                    save_last_n_steps = gr.Textbox(label="只保留最后N步", value="")
-                with gr.Row():
-                    save_state = gr.Checkbox(label="保存训练状态", value=False)
-                    save_state_on_train_end = gr.Checkbox(label="仅结束时保存状态", value=False)
-                    log_with = gr.Dropdown(label="日志监控 (--log_with)", 
-                                           choices=["", "tensorboard", "wandb", "all"], 
-                                           value="tensorboard")
-                    logging_dir = gr.Textbox(label="日志路径 (--logging_dir)", value="./logs")
+def path_field(label, value="", placeholder="", button_text="选择", button_width=75):
+    lbl_lower = label.lower()
+    is_model = "dit" in lbl_lower or "vae" in lbl_lower or "text encoder" in lbl_lower or "lora" in lbl_lower or "权重" in lbl_lower
+    is_dir = "dir" in lbl_lower or "目录" in lbl_lower or "文件夹" in lbl_lower or "resume" in lbl_lower
+    
+    if is_dir:
+        mode = "dir"
+    elif is_model:
+        mode = "both"
+    else:
+        mode = "file"
+        
+    with gr.Column():
+        gr.HTML(f"<div class='field-chip'>{label}</div>")
+        with gr.Row(elem_classes="path-field", equal_height=True):
+            textbox = gr.Textbox(
+                value=value,
+                placeholder=placeholder,
+                show_label=False,
+                lines=1,
+                max_lines=1,
+                scale=1,
+                elem_classes="path-box",
+            )
+            btn_f = None
+            btn_d = None
+            if mode in ["file", "both"]:
+                btn_f = gr.Button("📄 文件" if mode == "both" else "📁 浏览", scale=0, min_width=button_width, elem_classes="path-upload")
+                btn_f.click(fn=_browse_file, outputs=textbox)
+            if mode in ["dir", "both"]:
+                btn_d = gr.Button("📂 目录" if mode == "both" else "📁 浏览", scale=0, min_width=button_width, elem_classes="path-upload")
+                btn_d.click(fn=_browse_dir, outputs=textbox)
+    
+    # 始终返回两个组件以保持原本外层解包(tuple unpacking) g_xxx, g_xxx_btn = path_field() 不会报错
+    # 即使 btn_f 为 None 也可以解包
+    return textbox, (btn_f if btn_f is not None else btn_d)
 
-            with gr.Accordion("🔀 数据加载与杂项", open=False):
-                with gr.Row():
-                    max_data_loader_n_workers = gr.Number(label="数据加载线程数", value=8, precision=0)
-                    persistent_data_loader_workers = gr.Checkbox(label="持久化工人", value=True)
-                with gr.Row():
-                    cuda_allow_tf32 = gr.Checkbox(label="cuda_allow_tf32", value=True)
-                    cuda_cudnn_benchmark = gr.Checkbox(label="cuda_cudnn_benchmark", value=True)
-                with gr.Row():
-                    training_comment = gr.Textbox(label="训练备注", value="")
-                    metadata_title = gr.Textbox(label="Metadata Title", value="")
-                    metadata_author = gr.Textbox(label="Metadata Author", value="")
-                    metadata_description = gr.Textbox(label="Metadata Description", value="")
+
+with gr.Blocks(title="FLUX.2 训练控制台", theme=ui_theme, css=css) as app:
+    with gr.Column(elem_classes="app-shell"):
+
+        # ═══════════════════════════════════════
+        #  Hero Header
+        # ═══════════════════════════════════════
+        with gr.Column(elem_classes="hero-header"):
+            gr.HTML("<div class='hero-title'>🎨 FLUX.2 图像模型训练中文控制台</div>")
+            gr.HTML("<div class='hero-subtitle'>支持 FLUX.2 dev、klein-4b、klein-9b 及其 base 版本的图像生成模型训练。</div>")
+
+        gr.Markdown("")
+
+        # ═══════════════════════════════════════
+        #  全局路径区
+        # ═══════════════════════════════════════
+        with gr.Column(elem_classes="panel-card"):
+            with gr.Row(elem_classes="panel-header"):
+                gr.HTML("<span class='panel-header-icon'>📂</span><span class='panel-header-text'>全局路径设置</span>")
 
             with gr.Row():
-                save_btn = gr.Button("💾 保存配置", variant="primary", size="lg")
-                save_status_tab = gr.Textbox(label="状态", interactive=False, scale=3)
+                with gr.Column(scale=3):
+                    g_dit, g_dit_btn = path_field(
+                        "DiT 模型路径 (--dit，必填)",
+                        placeholder="path/to/flux2-dev.safetensors",
+                        button_text="📁 浏览",
+                    )
+                g_model_ver = gr.Dropdown(
+                    label="模型版本 (--model_version)",
+                    choices=["dev", "klein-4b", "klein-base-4b", "klein-9b", "klein-base-9b"],
+                    value="dev",
+                    scale=1,
+                )
 
-        # ══════════════════════════════════
-        #  Tab 3: 训练
-        # ══════════════════════════════════
-        with gr.Tab("🚀 3. 训练及进度显示"):
-            gr.Markdown("点击【启动训练】后，将依据顶部配置文件路径所指定的 TOML 文件启动训练。")
             with gr.Row():
-                train_btn = gr.Button("🚀 一键启动 FLUX.2 训练", variant="primary", size="lg")
-                stop_btn = gr.Button("⏹ 终止当前进程", variant="stop", size="lg")
-            train_status = gr.Textbox(label="状态", interactive=False)
-            train_btn.click(fn=run_training, inputs=[g_config_path], outputs=train_status)
-            stop_btn.click(fn=stop_process, outputs=train_status)
+                with gr.Column(scale=1):
+                    g_vae, g_vae_btn = path_field(
+                        "VAE 路径 (--vae，必填)",
+                        placeholder="path/to/ae.safetensors",
+                        button_text="📁 浏览",
+                    )
+                with gr.Column(scale=1):
+                    g_text_encoder, g_text_encoder_btn = path_field(
+                        "Text Encoder 路径 (--text_encoder，必填)",
+                        placeholder="path/to/00001-of-00010.safetensors",
+                        button_text="📁 浏览",
+                    )
 
-    # ────────────────────────────────────
-    #  调试终端输出
-    # ────────────────────────────────────
-    gr.Markdown("---")
-    gr.Markdown("### 🖥️ 调试命令终端输出")
-    with gr.Row():
-        clear_btn = gr.Button("🗑 清空日志", size="sm")
-    log_output = gr.Textbox(
-        label="终端输出（0.5s 自动刷新）",
-        lines=35, max_lines=35, autoscroll=True, interactive=False
-    )
-    clear_btn.click(fn=clear_logs, outputs=log_output)
-    timer = gr.Timer(0.5)
-    timer.tick(update_logs, inputs=[log_output], outputs=[log_output])
+            with gr.Row():
+                with gr.Column(scale=1):
+                    g_dataset, g_dataset_btn = path_field(
+                        "数据集配置文件 (--dataset_config)",
+                        value="dataset_flux2.toml",
+                        button_text="📁 浏览",
+                    )
+                with gr.Column(scale=1):
+                    g_output_dir, g_output_dir_btn = path_field(
+                        "输出目录 (--output_dir)",
+                        value="./outputs",
+                        button_text="📁 浏览",
+                    )
+                g_output_name = gr.Textbox(
+                    label="输出模型名称 (--output_name)",
+                    value="flux2_lora",
+                    scale=1,
+                )
 
-    # ──────────────────────────────────────
+            with gr.Row():
+                g_config_path, g_config_path_btn = path_field(
+                    "训练配置文件路径（保存 / 读取）",
+                    value="flux2_train_config.toml",
+                    button_text="📁 浏览",
+                )
+
+            with gr.Row(elem_classes="btn-bar"):
+                load_btn = gr.Button("📂 载入配置文件", size="sm")
+                save_top_btn = gr.Button("💾 快速保存配置", variant="primary", size="sm")
+                reset_btn = gr.Button("↺ 恢复默认参数", size="sm")
+
+            load_status = gr.Textbox(label="状态", interactive=False, elem_classes="tight-status")
+
+        gr.Markdown("")
+
+        # ═══════════════════════════════════════
+        #  Tabs
+        # ═══════════════════════════════════════
+        with gr.Tabs(elem_classes="tab-nav"):
+
+            # ─────────────────────────────────────
+            #  Tab 1: 数据集准备
+            # ─────────────────────────────────────
+            with gr.Tab("🗂️ 数据集准备"):
+
+                with gr.Accordion("📝 生成数据集配置文件 (TOML)", open=True):
+                    gr.Markdown("<div class='hint-text'>FLUX.2 是图像生成模型，请配置图像数据集。支持单图训练和多图训练，<code>control_images</code> 用于参考图像。</div>")
+
+                    with gr.Row():
+                        ds_res_w = gr.Number(label="Resolution Width", value=1024, precision=0)
+                        ds_res_h = gr.Number(label="Resolution Height", value=1024, precision=0)
+                        ds_cap_ext = gr.Textbox(label="Caption Extension", value=".txt")
+
+                    with gr.Row():
+                        ds_batch_size = gr.Number(label="Batch Size", value=1, precision=0)
+                        ds_enable_bucket = gr.Checkbox(label="Enable Bucket", value=True)
+                        ds_bucket_no_upscale = gr.Checkbox(label="Bucket No Upscale", value=False)
+
+                    with gr.Row():
+                        with gr.Column(scale=1):
+                            ds_img_dir, ds_img_dir_btn = path_field(
+                                "Image Directory (图像文件夹)",
+                                placeholder="path/to/images",
+                                button_text="📁 浏览",
+                            )
+                        with gr.Column(scale=1):
+                            ds_cache_dir, ds_cache_dir_btn = path_field(
+                                "Cache Directory (缓存文件夹)",
+                                placeholder="path/to/cache",
+                                button_text="📁 浏览",
+                            )
+
+                    ds_control_dir, ds_control_dir_btn = path_field(
+                        "Control Images Dir (参考图像文件夹，可选)",
+                        placeholder="path/to/control_images",
+                        button_text="📁 浏览",
+                    )
+
+                    with gr.Row():
+                        with gr.Column(scale=2):
+                            ds_save_path, ds_save_path_btn = path_field(
+                                "保存路径",
+                                value="dataset_flux2.toml",
+                                button_text="📁 浏览",
+                            )
+                        with gr.Column(scale=1, min_width=220):
+                            ds_gen_btn = gr.Button("📄 生成数据集配置", variant="primary", size="lg")
+
+                    ds_gen_status = gr.Textbox(label="状态", interactive=False, elem_classes="tight-status")
+
+                    ds_gen_btn.click(
+                        fn=generate_dataset_toml,
+                        inputs=[ds_res_w, ds_res_h, ds_cap_ext, ds_batch_size, ds_enable_bucket, ds_bucket_no_upscale,
+                                ds_img_dir, ds_cache_dir, ds_control_dir, ds_save_path, g_config_path],
+                        outputs=[ds_gen_status, g_dataset]
+                    )
+
+                with gr.Accordion("🗂️ 预缓存 Latent 与文本特征", open=True):
+                    gr.Markdown("<div class='hint-text'>预缓存图像 Latent 和文本编码器输出，大幅加速训练。<br><strong>模型路径和数据集配置文件均读取自顶部全局设置，无需重复填写。</strong></div>")
+
+                    with gr.Row():
+                        with gr.Column():
+                            gr.Markdown("<div style='font-weight:700;font-size:14px;margin-bottom:8px;color:#e4e4e7;'>🎞️ Cache Latents（编码图像特征）</div>")
+                            with gr.Row():
+                                c_vae_dtype = gr.Dropdown(
+                                    label="VAE Dtype",
+                                    choices=["", "float32", "bfloat16"],
+                                    value="bfloat16",
+                                    info="默认 float32，bfloat16 可减少显存",
+                                )
+                                c_skip_lc = gr.Checkbox(label="跳过已缓存文件 (--skip_existing)", value=True)
+                            cache_latents_btn = gr.Button("▶ 运行 Cache Latents", variant="primary")
+
+                        with gr.Column():
+                            gr.Markdown("<div style='font-weight:700;font-size:14px;margin-bottom:8px;color:#e4e4e7;'>🔤 Cache Text Encoder（编码文本特征）</div>")
+                            te_dtype = gr.Dropdown(
+                                label="Text Encoder Dtype",
+                                choices=["", "fp16", "bf16", "fp32"],
+                                value="bf16",
+                            )
+                            te_skip = gr.Checkbox(label="跳过已缓存文件 (--skip_existing)", value=True)
+                            te_fp8 = gr.Checkbox(
+                                label="FP8 Text Encoder (--fp8_text_encoder)",
+                                value=False,
+                                info="dev(Mistral 3) 不支持此选项",
+                            )
+                            cache_te_btn = gr.Button("▶ 运行 Cache Text Encoder", variant="primary")
+
+                    cache_status = gr.Textbox(label="操作状态", interactive=False, elem_classes="tight-status")
+
+                    cache_latents_btn.click(
+                        fn=run_cache_latents,
+                        inputs=[g_dataset, g_dit, g_vae, c_vae_dtype, c_skip_lc, g_model_ver],
+                        outputs=cache_status
+                    )
+                    cache_te_btn.click(
+                        fn=run_cache_te,
+                        inputs=[g_dataset, g_text_encoder, te_dtype, te_skip, g_model_ver, te_fp8],
+                        outputs=cache_status
+                    )
+
+            # ─────────────────────────────────────
+            #  Tab 2: 训练参数配置
+            # ─────────────────────────────────────
+            with gr.Tab("⚙️ 训练参数配置"):
+                with gr.Accordion("🎨 模型与 LoRA 设置", open=True):
+                    with gr.Row():
+                        network_module = gr.Dropdown(
+                            label="网络模块 (--network_module)",
+                            choices=["networks.lora_flux_2"],
+                            value="networks.lora_flux_2",
+                            info="FLUX.2 必须使用 networks.lora_flux_2",
+                        )
+                        network_dim = gr.Number(label="Network Dim / Rank", value=32, precision=0)
+                        network_alpha = gr.Number(label="Network Alpha", value=16)
+                    with gr.Row():
+                        network_dropout = gr.Number(label="Network Dropout", value=0)
+                        scale_weight_norms = gr.Number(label="Scale Weight Norms", value=0)
+                    with gr.Row():
+                        with gr.Column(scale=3):
+                            network_weights, network_weights_btn = path_field(
+                                "续训 LoRA 权重路径",
+                                placeholder="空 = 从头训练",
+                                button_text="📁 浏览",
+                            )
+                        dim_from_weights = gr.Checkbox(label="从权重读取 Dim", value=False)
+                        with gr.Column(scale=3):
+                            resume, resume_btn = path_field(
+                                "续训状态路径 (--resume)",
+                                placeholder="空 = 不续训",
+                                button_text="📁 浏览",
+                            )
+                    with gr.Row():
+                        enable_lora_plus = gr.Checkbox(label="启用 LoRA+", value=True)
+                        loraplus_lr_ratio = gr.Number(label="LoRA+ LR Ratio", value=4)
+                        enable_blocks = gr.Checkbox(label="启用块控制", value=False)
+                        exclude_patterns = gr.Textbox(label="Exclude Patterns")
+                        include_patterns = gr.Textbox(label="Include Patterns")
+
+                with gr.Accordion("⏱️ 训练时长与批次", open=True):
+                    with gr.Row():
+                        max_train_epochs = gr.Number(label="最大 Epoch 数", value=16, precision=0)
+                        max_train_steps = gr.Textbox(label="最大训练步数 (空=不限)", value="")
+                        batch_size = gr.Number(label="批次大小", value=1, precision=0)
+                        seed = gr.Number(label="随机种子", value=42, precision=0)
+                    with gr.Row():
+                        gradient_checkpointing = gr.Checkbox(label="梯度检查点", value=True)
+                        gradient_accumulation_steps = gr.Number(label="梯度累积步数", value=1, precision=0)
+                        caption_dropout_rate = gr.Number(label="Caption Dropout Rate", value=0.0)
+
+                with gr.Accordion("⚡ 精度与内存优化", open=False):
+                    gr.Markdown("<div class='hint-text'><strong>内存优化推荐设置：</strong><br>• 基础优化：<code>--fp8_base --fp8_scaled</code> (DiT) + <code>--fp8_text_encoder</code> (Text Encoder, 除 dev 外)<br>• 进一步：<code>--blocks_to_swap</code> (不同模型最大值: dev=29, klein-4b=13, klein-9b=16)<br>• 极限：<code>--gradient_checkpointing_cpu_offload</code></div>")
+                    with gr.Row():
+                        mixed_precision = gr.Dropdown(
+                            label="混合精度",
+                            choices=["bf16", "fp16", "no"],
+                            value="bf16",
+                            info="FLUX.2 推荐使用 bf16",
+                        )
+                        vae_dtype = gr.Dropdown(label="VAE Dtype", choices=["", "float32", "bfloat16"], value="")
+                    with gr.Row():
+                        fp8_base = gr.Checkbox(label="FP8 Base (--fp8_base, DiT)", value=True)
+                        fp8_scaled = gr.Checkbox(
+                            label="FP8 Scaled (--fp8_scaled, DiT)",
+                            value=True,
+                            info="使用 fp8_base 时建议同时启用",
+                        )
+                        fp8_text_encoder = gr.Checkbox(
+                            label="FP8 Text Encoder (--fp8_text_encoder)",
+                            value=False,
+                            info="dev(Mistral 3) 不支持",
+                        )
+                    with gr.Row():
+                        attention_mode = gr.Dropdown(label="注意力机制", choices=["sdpa", "flash_attn", "xformers"], value="sdpa")
+                        blocks_to_swap = gr.Number(
+                            label="Blocks to Swap",
+                            value=0,
+                            precision=0,
+                            info="dev 最大 29, klein-4b 最大 13, klein-9b 最大 16",
+                        )
+                        use_pinned_memory_for_block_swap = gr.Checkbox(label="Pinned Memory", value=True)
+                    with gr.Row():
+                        gradient_checkpointing_cpu_offload = gr.Checkbox(label="梯度检查点 CPU Offload", value=False)
+
+                with gr.Accordion("📊 Loss 设置", open=False):
+                    with gr.Row():
+                        loss_type = gr.Dropdown(label="Loss 类型", choices=["mse", "mae", "l1", "huber", "smooth_l1"], value="mse")
+                        huber_delta = gr.Number(label="Huber Delta", value=1.0)
+
+                with gr.Accordion("📈 学习率设置", open=False):
+                    with gr.Row():
+                        lr = gr.Textbox(label="学习率", value="1e-4")
+                        lr_scheduler = gr.Dropdown(
+                            label="调度器",
+                            choices=[
+                                "constant", "constant_with_warmup", "linear", "cosine",
+                                "cosine_with_restarts", "polynomial", "cosine_with_min_lr",
+                                "warmup_stable_decay", "inverse_sqrt",
+                            ],
+                            value="constant_with_warmup",
+                        )
+                    with gr.Row():
+                        lr_warmup_steps = gr.Number(label="预热步数", value=50, precision=0)
+                        lr_decay_steps = gr.Number(label="衰减步数", value=0.2)
+                        lr_scheduler_num_cycles = gr.Number(label="余弦重启次数", value=1, precision=0)
+                        lr_scheduler_power = gr.Number(label="Poly Power", value=1.0)
+                        lr_scheduler_timescale = gr.Number(label="Timescale", value=0, precision=0)
+                        lr_scheduler_min_lr_ratio = gr.Number(label="Min LR Ratio", value=0.1)
+
+                with gr.Accordion("⏰ 时间步采样", open=False):
+                    with gr.Row():
+                        timestep_sampling = gr.Dropdown(
+                            label="时间步采样方式",
+                            choices=["sigma", "uniform", "sigmoid", "shift", "flux_shift", "flux2_shift", "logsnr", "shifted_logit_normal"],
+                            value="flux2_shift",
+                            info="FLUX.2 推荐使用 flux2_shift",
+                        )
+                    with gr.Row():
+                        weighting_scheme = gr.Dropdown(label="加权方案", choices=["none", "sigma_sqrt", "logit_normal", "mode", "cosmap"], value="none")
+                        logit_mean = gr.Number(label="Logit Mean", value=0.0)
+                        logit_std = gr.Number(label="Logit Std", value=1.0)
+                        mode_scale = gr.Number(label="Mode Scale", value=1.29)
+                        min_timestep = gr.Number(label="Min Timestep", value=0, precision=0)
+                        max_timestep = gr.Number(label="Max Timestep", value=1000, precision=0)
+
+                with gr.Accordion("🔧 优化器", open=False):
+                    with gr.Row():
+                        optimizer_type = gr.Dropdown(
+                            label="优化器类型",
+                            choices=[
+                                "AdamW", "AdamW8bit", "PagedAdamW8bit", "adafactor",
+                                "Lion", "Lion8bit", "prodigyopt.Prodigy", "DAdaptAdam",
+                                "Sophia", "Ranger", "StableAdamW", "SOAP",
+                                "adopt", "came", "ademamix", "fira", "sgdsai",
+                                "Muon", "schedulefree.AdamWScheduleFree", "schedulefree.RAdamScheduleFree",
+                            ],
+                            value="AdamW8bit",
+                        )
+                        max_grad_norm = gr.Number(label="Max Grad Norm", value=1.0)
+
+                with gr.Accordion("💾 保存与追踪监控", open=False):
+                    with gr.Row():
+                        save_every_n_epochs = gr.Number(label="每N Epoch 保存", value=1, precision=0)
+                        save_every_n_steps = gr.Textbox(label="每 N 步保存 (空 = 用 Epoch)", value="")
+                        save_last_n_epochs = gr.Textbox(label="只保留最后 N 轮", value="")
+                        save_last_n_steps = gr.Textbox(label="只保留最后 N 步", value="")
+                    with gr.Row():
+                        save_state = gr.Checkbox(label="保存训练状态", value=False)
+                        save_state_on_train_end = gr.Checkbox(label="仅结束时保存状态", value=False)
+                        log_with = gr.Dropdown(
+                            label="日志监控 (--log_with)",
+                            choices=["", "tensorboard", "wandb", "all"],
+                            value="tensorboard",
+                        )
+                    logging_dir, logging_dir_btn = path_field(
+                        "日志路径 (--logging_dir)",
+                        value="./logs",
+                        button_text="📁 浏览",
+                    )
+
+                with gr.Accordion("🔀 数据加载与杂项", open=False):
+                    with gr.Row():
+                        max_data_loader_n_workers = gr.Number(label="数据加载线程数", value=8, precision=0)
+                        persistent_data_loader_workers = gr.Checkbox(label="持久化工人", value=True)
+                    with gr.Row():
+                        cuda_allow_tf32 = gr.Checkbox(label="cuda_allow_tf32", value=True)
+                        cuda_cudnn_benchmark = gr.Checkbox(label="cuda_cudnn_benchmark", value=True)
+                    with gr.Row():
+                        training_comment = gr.Textbox(label="训练备注", value="")
+                        metadata_title = gr.Textbox(label="Metadata Title", value="")
+                        metadata_author = gr.Textbox(label="Metadata Author", value="")
+                        metadata_description = gr.Textbox(label="Metadata Description", value="")
+
+                with gr.Row(elem_classes="btn-bar"):
+                    save_btn = gr.Button("💾 保存配置", variant="primary", size="lg")
+                    save_status_tab = gr.Textbox(label="状态", interactive=False, scale=3, elem_classes="tight-status")
+
+            # ─────────────────────────────────────
+            #  Tab 3: 训练
+            # ─────────────────────────────────────
+            with gr.Tab("🚀 训练及进度显示"):
+                with gr.Column(elem_classes="panel-card", variant="compact"):
+                    gr.Markdown("<div class='hint-text'>点击【启动训练】后，将依据顶部配置文件路径所指定的 TOML 文件启动训练。</div>")
+                    with gr.Row(elem_classes="train-action-bar"):
+                        train_btn = gr.Button("🚀 一键启动 FLUX.2 训练", variant="primary", size="lg")
+                        stop_btn = gr.Button("⏹ 终止当前进程", variant="stop", size="lg")
+                    train_status = gr.Textbox(label="状态", interactive=False, elem_classes="tight-status")
+                    train_btn.click(fn=run_training, inputs=[g_config_path], outputs=train_status)
+                    stop_btn.click(fn=stop_process, outputs=train_status)
+
+        # ═══════════════════════════════════════
+        #  调试终端输出
+        # ═══════════════════════════════════════
+        gr.Markdown("")
+        with gr.Column(elem_classes="panel-card"):
+            with gr.Row(elem_classes="panel-header"):
+                gr.HTML("<span class='panel-header-icon'>🖥️</span><span class='panel-header-text'>调试命令终端输出</span>")
+            with gr.Row(elem_classes="btn-bar"):
+                clear_btn = gr.Button("🗑 清空日志", size="sm")
+            log_output = gr.Textbox(
+                label="终端输出（0.5s 自动刷新）",
+                lines=35, max_lines=35, autoscroll=True, interactive=False,
+                elem_classes="terminal-box",
+            )
+            clear_btn.click(fn=clear_logs, outputs=log_output)
+            timer = gr.Timer(0.5)
+            timer.tick(update_logs, inputs=[log_output], outputs=[log_output])
+
+    # ═══════════════════════════════════════
     #  收集所有参数（用于保存/载入）
-    # ──────────────────────────────────────
+    # ═══════════════════════════════════════
     _all_args = [
         g_dit, g_vae, g_text_encoder, g_output_dir, g_output_name, g_dataset,
         g_model_ver, network_module,
@@ -923,7 +1455,7 @@ with gr.Blocks(title="FLUX.2 训练控制台", theme=ui_theme) as app:
         max_train_epochs, max_train_steps, batch_size, seed,
         gradient_checkpointing, gradient_checkpointing_cpu_offload, gradient_accumulation_steps,
         caption_dropout_rate,
-        mixed_precision, vae_dtype, 
+        mixed_precision, vae_dtype,
         fp8_base, fp8_scaled, fp8_text_encoder,
         attention_mode, blocks_to_swap, use_pinned_memory_for_block_swap,
         loss_type, huber_delta,
@@ -1062,6 +1594,12 @@ with gr.Blocks(title="FLUX.2 训练控制台", theme=ui_theme) as app:
             inputs=[g_config_path, ds_save_path] + _all_args + dataset_components,
             outputs=[]
         )
+
+    # ──────────────────────────────────────
+    #  文件选择按钮事件绑定
+    # ──────────────────────────────────────
+    pass  # 使用了内置的本地 Tkinter 窗口，不需要再绑定 upload
+
 
 if __name__ == "__main__":
     app.launch(server_name="127.0.0.1", server_port=7861, inbrowser=True)
