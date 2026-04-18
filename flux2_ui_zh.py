@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """FLUX.2 模型训练 WebUI (中文版) - 图像生成模型训练界面"""
 import gradio as gr
-import subprocess, threading, queue, toml, os, sys, json
+import subprocess, threading, queue, toml, os, sys, json, glob
 
 
 
@@ -621,26 +621,98 @@ def run_training(config_path):
 # ──────────────────────────────────────
 #  文件选择辅助函数
 # ──────────────────────────────────────
-import sys
-import subprocess
+_tk_python_cmd = None
+
+
+def _find_tk_python_cmd():
+    candidates = []
+    seen = set()
+
+    def add_candidate(cmd):
+        key = tuple(cmd)
+        if key not in seen:
+            seen.add(key)
+            candidates.append(cmd)
+
+    add_candidate([sys.executable])
+    if os.name == "nt":
+        add_candidate(["py", "-3"])
+        add_candidate(["python"])
+        windows_apps = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Microsoft", "WindowsApps")
+        app_alias = os.path.join(windows_apps, "python.exe")
+        if os.path.exists(app_alias):
+            add_candidate([app_alias])
+        for exe in glob.glob(os.path.join(windows_apps, "PythonSoftwareFoundation.Python.*", "python.exe")):
+            add_candidate([exe])
+    else:
+        add_candidate(["python3"])
+        add_candidate(["python"])
+
+    for cmd in candidates:
+        try:
+            probe = subprocess.run(
+                cmd + ["-c", "import tkinter"],
+                capture_output=True,
+                text=True,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+            )
+            if probe.returncode == 0:
+                return cmd
+        except FileNotFoundError:
+            continue
+        except Exception as e:
+            log_queue.put(f"[检测 Tk Python 失败] {' '.join(cmd)}: {e}\n")
+
+    return None
+
+
+def _get_tk_python_cmd():
+    global _tk_python_cmd
+    if _tk_python_cmd is None:
+        _tk_python_cmd = _find_tk_python_cmd()
+        if _tk_python_cmd:
+            log_queue.put(f"[文件选择器] 使用 {' '.join(_tk_python_cmd)}\n")
+        else:
+            log_queue.put("[文件选择器错误] 未找到可用的 tkinter Python 解释器。\n")
+    return _tk_python_cmd
+
+
+def _browse_with_dialog(dialog_expr, kind):
+    try:
+        python_cmd = _get_tk_python_cmd()
+        if not python_cmd:
+            return gr.update()
+
+        code = (
+            "import tkinter as tk; from tkinter import filedialog; "
+            "root = tk.Tk(); root.withdraw(); root.update(); "
+            "root.attributes('-topmost', True); root.lift(); root.focus_force(); "
+            f"p = {dialog_expr}; root.destroy(); print(p)"
+        )
+        kwargs = {}
+        if os.name == "nt":
+            kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+        res = subprocess.run(
+            python_cmd + ["-c", code],
+            capture_output=True, text=True, **kwargs
+        )
+        if res.returncode != 0:
+            err = res.stderr.strip() if res.stderr else "未知错误"
+            log_queue.put(f"[{kind}选择器错误] {err}\n")
+            return gr.update()
+        p = res.stdout.strip()
+        return p if p else gr.update()
+    except Exception as e:
+        log_queue.put(f"[{kind}选择异常] {e}\n")
+        return gr.update()
+
 
 def _browse_file():
-    try:
-        code = "import tkinter as tk; from tkinter import filedialog; root = tk.Tk(); root.attributes('-topmost', True); root.withdraw(); p = filedialog.askopenfilename(); root.destroy(); print(p)"
-        res = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
-        p = res.stdout.strip()
-        return p if p else gr.update()
-    except Exception as e:
-        return gr.update()
+    return _browse_with_dialog("filedialog.askopenfilename(parent=root)", "文件")
+
 
 def _browse_dir():
-    try:
-        code = "import tkinter as tk; from tkinter import filedialog; root = tk.Tk(); root.attributes('-topmost', True); root.withdraw(); p = filedialog.askdirectory(); root.destroy(); print(p)"
-        res = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
-        p = res.stdout.strip()
-        return p if p else gr.update()
-    except Exception as e:
-        return gr.update()
+    return _browse_with_dialog("filedialog.askdirectory(parent=root)", "目录")
 
 def on_file_upload(file_obj):
     """处理文件上传，返回文件路径"""
